@@ -26,6 +26,7 @@ vector<vector<int> > ans;
 vector<vector<Light> > light;
 vector<Position> numberGrids;
 vector<Position> unlightedGrids;
+vector<Position> unsetableGrids;
 
 int row, column;
 
@@ -187,6 +188,25 @@ void scanNumberGrids()
     sort(numberGrids.begin(), numberGrids.end(), mySort);
 }
 
+void scanUnsetableGrids()
+{
+    unsetableGrids.clear();
+    Position pos;
+    for (int i = 0; i < row; i++)
+    {
+        for (int j = 0; j < column; j++)
+        {
+            if (puzzle[i][j] == WHITE && light[i][j].setable <= 0 && !isLighted(i, j))
+            {
+                pos.row = i;
+                pos.col = j;
+                pos.number = 0;
+                unsetableGrids.push_back(pos);
+            }
+        }
+    }
+}
+
 void scanUnlightedGrids()
 {
     unlightedGrids.clear();
@@ -204,6 +224,51 @@ void scanUnlightedGrids()
             }
         }
     }
+}
+
+bool isLightable(int row, int col)
+{
+    for (int i = row - 1; i >= 0; i--)
+    {
+        if (puzzle[i][col] == WHITE)
+        {
+            if (light[i][col].setable > 0 && !isLighted(i, col))
+                return true;
+        }
+        else break; // blocked
+    }
+
+    for (int i = row + 1; i < column; i++)
+    {
+        if (puzzle[i][col] == WHITE)
+        {
+            if (light[i][col].setable > 0 && !isLighted(i, col))
+                return true;
+        }
+        else break;
+    }
+
+    for (int j = col - 1; j >= 0; j--)
+    {
+        if (puzzle[row][j] == WHITE)
+        {
+            if (light[row][j].setable > 0 && !isLighted(row, j))
+                return true;
+        }
+        else break;
+    }
+
+    for (int j = col + 1; j < column; j++)
+    {
+        if (puzzle[row][j] == WHITE)
+        {
+            if (light[row][j].setable > 0 && !isLighted(row, j))
+                return true;
+        }
+        else break;
+    }
+
+    return false;
 }
 
 int count = 0;
@@ -244,17 +309,19 @@ bool step(int index)
     // found a posible solution
     if (index == numberGrids.size()) 
     {
-        //displayLight();
         //displayLighted();
 
         // TODO: priority processing
-        // light those unsetable grids first:
-        // set a light on a certain grid around
-
-
+        // check those unsetable grids first
+        scanUnsetableGrids();
+        for (int i = 0; i < unsetableGrids.size(); i++)
+        {
+            if (!isLightable(unsetableGrids[i].row, unsetableGrids[i].col)) return false;
+            // set a light on a certain grid around
+        }
+        displayLighted();
         // TODO: complement
         scanUnlightedGrids();
-        //complement();
 
         // for (int i = 0; i < unlightedGrids.size(); i++)
         //     printf("%d %d\n", unlightedGrids[i].row, unlightedGrids[i].col);
