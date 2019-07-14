@@ -27,6 +27,7 @@ vector<vector<Light> > light;
 vector<Position> numberGrids;
 vector<Position> unlightedGrids;
 vector<Position> unsetableGrids;
+vector<Position> mustSetGrids;
 
 int row, column;
 
@@ -91,12 +92,56 @@ bool isLighted(int row, int col)
     return lighted;
 }
 
+bool isLightable(int row, int col)
+{
+    for (int i = row - 1; i >= 0; i--)
+    {
+        if (puzzle[i][col] == WHITE)
+        {
+            if (light[i][col].setable > 0 && !isLighted(i, col))
+                return true;
+        }
+        else break; // blocked
+    }
+
+    for (int i = row + 1; i < column; i++)
+    {
+        if (puzzle[i][col] == WHITE)
+        {
+            if (light[i][col].setable > 0 && !isLighted(i, col))
+                return true;
+        }
+        else break;
+    }
+
+    for (int j = col - 1; j >= 0; j--)
+    {
+        if (puzzle[row][j] == WHITE)
+        {
+            if (light[row][j].setable > 0 && !isLighted(row, j))
+                return true;
+        }
+        else break;
+    }
+
+    for (int j = col + 1; j < column; j++)
+    {
+        if (puzzle[row][j] == WHITE)
+        {
+            if (light[row][j].setable > 0 && !isLighted(row, j))
+                return true;
+        }
+        else break;
+    }
+
+    return false;
+}
+
 bool setLight(int row, int col)
 {
     if (row < 0 || row >= aka::row) return false;
     if (col < 0 || col >= aka::column) return false;
 
-    //printf("%d %d setable: %d\n", row, col, light[row][col].setable);
     if (light[row][col].setable <= 0) return false;
     if (light[row][col].hasLight > 0)
     {
@@ -106,7 +151,7 @@ bool setLight(int row, int col)
     if (isLighted(row, col)) return false;  // duplicate
 
     light[row][col].hasLight++;    // set a light
-    //printf("%d %d\n", row, col);
+
     return true;
 }
 
@@ -153,7 +198,7 @@ bool disable(int row, int col)
     if (light[row][col].hasLight > 0) return false;
     
     light[row][col].setable--;
-    //printf("disable:%d %d\n", row, col);
+    
     return true;
 }
 
@@ -226,57 +271,29 @@ void scanUnlightedGrids()
     }
 }
 
-bool isLightable(int row, int col)
+void scanMustSetGrids()
 {
-    for (int i = row - 1; i >= 0; i--)
+    mustSetGrids.clear();
+    Position pos;
+    for (int i = 0; i < row; i++)
     {
-        if (puzzle[i][col] == WHITE)
+        for (int j = 0; j < column; j++)
         {
-            if (light[i][col].setable > 0 && !isLighted(i, col))
-                return true;
+            if (light[i][j].setable > 0 && !isLighted(i, j) && !isLightable(i, j))
+            {
+                pos.row = i;
+                pos.col = j;
+                pos.number = 0;
+                mustSetGrids.push_back(pos);
+            }
         }
-        else break; // blocked
     }
-
-    for (int i = row + 1; i < column; i++)
-    {
-        if (puzzle[i][col] == WHITE)
-        {
-            if (light[i][col].setable > 0 && !isLighted(i, col))
-                return true;
-        }
-        else break;
-    }
-
-    for (int j = col - 1; j >= 0; j--)
-    {
-        if (puzzle[row][j] == WHITE)
-        {
-            if (light[row][j].setable > 0 && !isLighted(row, j))
-                return true;
-        }
-        else break;
-    }
-
-    for (int j = col + 1; j < column; j++)
-    {
-        if (puzzle[row][j] == WHITE)
-        {
-            if (light[row][j].setable > 0 && !isLighted(row, j))
-                return true;
-        }
-        else break;
-    }
-
-    return false;
 }
 
 int count = 0;
 
 bool complement()
 {
-    //printf("%d\n", count);
-    //displayLight();
     if (isSolution()) return true;
     if (count == unlightedGrids.size()) return false;
 
@@ -305,22 +322,24 @@ bool complement()
 
 bool step(int index)
 {
-    //displayLight();
     // found a posible solution
     if (index == numberGrids.size()) 
     {
-        //displayLighted();
-
-        // TODO: priority processing
+        // priority processing
         // check those unsetable grids first
         scanUnsetableGrids();
         for (int i = 0; i < unsetableGrids.size(); i++)
         {
             if (!isLightable(unsetableGrids[i].row, unsetableGrids[i].col)) return false;
-            // set a light on a certain grid around
         }
-        displayLighted();
-        // TODO: complement
+
+        scanMustSetGrids();
+        for (int i = 0; i < mustSetGrids.size(); i++)
+        {
+            light[mustSetGrids[i].row][mustSetGrids[i].col].hasLight++;
+        }
+        
+        // complement
         scanUnlightedGrids();
 
         // for (int i = 0; i < unlightedGrids.size(); i++)
@@ -339,189 +358,289 @@ bool step(int index)
     switch (number)
     {
         case 0:
-            if (disable(row - 1, col) && disable(row + 1, col) && disable(row, col - 1) && disable(row, col + 1))
+            if (disable(row - 1, col))
             {
-                if (step(index + 1)) return true;
+                if (disable(row + 1, col))
+                {
+                    if (disable(row, col - 1))
+                    {
+                        if (disable(row, col + 1))
+                        {
+                            if (step(index + 1)) return true;
+                            enable(row, col + 1);
+                        }
+                        enable(row, col - 1);
+                    }
+                    enable(row + 1, col);
+                }
                 enable(row - 1, col);
-                enable(row + 1, col);
-                enable(row, col - 1);
-                enable(row, col + 1);
             }
             break;
         case 1:
-            if (disable(row + 1, col) && disable(row, col - 1) && disable(row, col + 1))
-            {
-                if (setLight(row - 1, col))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row - 1, col);
-                }
-                enable(row + 1, col);
-                enable(row, col - 1);
-                enable(row, col + 1);
-            }
-            if (disable(row - 1, col) && disable(row, col - 1) && disable(row, col + 1))
-            {
-                if (setLight(row + 1, col))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row + 1, col);
-                }
-                enable(row - 1, col);
-                enable(row, col - 1);
-                enable(row, col + 1);
-                
-            }
-            if (disable(row - 1, col) && disable(row + 1, col) && disable(row, col + 1))
-            {
-                if (setLight(row, col - 1))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row, col - 1);
-                }
-                enable(row - 1, col);
-                enable(row + 1, col);
-                enable(row, col + 1);
-            }
-            if (disable(row - 1, col) && disable(row + 1, col) && disable(row, col - 1))
-            {
-                if (setLight(row, col + 1))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row, col + 1);
-                }
-                enable(row - 1, col);
-                enable(row + 1, col);
-                enable(row, col - 1);
-            }
-            break;
-        case 2:
-            if (disable(row, col - 1) && disable(row, col + 1))
-            {
-                if (setLight(row - 1, col) && setLight(row + 1, col))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row - 1, col);
-                    removeLight(row + 1, col);
-                }
-                enable(row, col - 1);
-                enable(row, col + 1);
-            }
-            if (disable(row + 1, col) && disable(row, col + 1))
-            {
-                if (setLight(row - 1, col) && setLight(row, col - 1))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row - 1, col);
-                    removeLight(row, col - 1);
-                }
-                enable(row + 1, col);
-                enable(row, col + 1);
-            }
-            if (disable(row + 1, col) && disable(row, col - 1))
-            {
-                if (setLight(row - 1, col) && setLight(row, col + 1))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row - 1, col);
-                    removeLight(row, col + 1);
-                }
-                enable(row + 1, col);
-                enable(row, col - 1);
-            }
-            if (disable(row - 1, col) && disable(row, col + 1))
-            {
-                if (setLight(row + 1, col) && setLight(row, col - 1))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row + 1, col);
-                    removeLight(row, col - 1);
-                }
-                enable(row - 1, col);
-                enable(row, col + 1);
-            }
-            if (disable(row - 1, col) && disable(row, col - 1))
-            {
-                if (setLight(row + 1, col) && setLight(row, col + 1))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row + 1, col);
-                    removeLight(row, col + 1);
-                }
-                enable(row - 1, col);
-                enable(row, col - 1);
-            }
-            if (disable(row - 1, col) && disable(row + 1, col))
-            {
-                if (setLight(row, col - 1) && setLight(row, col + 1))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row, col - 1);
-                    removeLight(row, col + 1);
-                }
-                enable(row - 1, col);
-                enable(row + 1, col);
-            }
-            break;
-        case 3:
-            if (disable(row, col + 1))
-            {
-                if (setLight(row - 1, col) && setLight(row + 1, col) && setLight(row, col - 1))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row - 1, col);
-                    removeLight(row + 1, col);
-                    removeLight(row, col - 1);
-                }
-                enable(row, col + 1);
-            }
-            if (disable(row, col - 1))
-            {
-                if (setLight(row - 1, col) && setLight(row + 1, col) && setLight(row, col + 1))
-                {
-                    if (step(index + 1)) return true;
-                    removeLight(row - 1, col);
-                    removeLight(row + 1, col);
-                    removeLight(row, col + 1);
-                }
-                enable(row, col - 1);
-            }
             if (disable(row + 1, col))
             {
-                if (setLight(row - 1, col) && setLight(row, col - 1) && setLight(row, col + 1))
+                if (disable(row, col - 1))
                 {
-                    if (step(index + 1)) return true;
-                    removeLight(row - 1, col);
-                    removeLight(row, col - 1);
-                    removeLight(row, col + 1);
+                    if (disable(row, col + 1))
+                    {
+                        if (setLight(row - 1, col))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row - 1, col);
+                        }
+                        enable(row, col + 1);
+                    }
+                    enable(row, col - 1);
                 }
                 enable(row + 1, col);
             }
             if (disable(row - 1, col))
             {
-                if (setLight(row + 1, col) && setLight(row, col - 1) && setLight(row, col + 1))
+                if (disable(row, col - 1))
                 {
-                    if (step(index + 1)) return true;
+                    if (disable(row, col + 1))
+                    {
+                        if (setLight(row + 1, col))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row + 1, col);
+                        }
+                        enable(row, col + 1);
+                    }
+                    enable(row, col - 1);
+                }
+                enable(row - 1, col);
+            }
+            if (disable(row - 1, col))
+            {
+                if (disable(row + 1, col))
+                {
+                    if (disable(row, col + 1))
+                    {
+                        if (setLight(row, col - 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col - 1);
+                        }
+                        enable(row, col + 1);
+                    }
+                    enable(row + 1, col);
+                }
+                enable(row - 1, col);
+            }
+            if (disable(row - 1, col))
+            {
+                if (disable(row + 1, col))
+                {
+                    if (disable(row, col - 1))
+                    {
+                        if (setLight(row, col + 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col + 1);
+                        }
+                        enable(row, col - 1);
+                    }
+                    enable(row + 1, col);
+                }
+                enable(row - 1, col);
+            }
+            break;
+        case 2:
+            if (disable(row, col - 1))
+            {
+                if (disable(row, col + 1))
+                {
+                    if (setLight(row - 1, col))
+                    {
+                        if (setLight(row + 1, col))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row + 1, col);
+                        }
+                        removeLight(row - 1, col);
+                    }
+                    enable(row, col + 1);
+                }
+                enable(row, col - 1);
+            }
+            if (disable(row + 1, col))
+            {
+                if (disable(row, col + 1))
+                {
+                    if (setLight(row - 1, col))
+                    {
+                        if (setLight(row, col - 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col - 1);
+                        }
+                        removeLight(row - 1, col);
+                    }                        
+                    enable(row, col + 1);
+                }
+                enable(row + 1, col);
+            }
+            if (disable(row + 1, col))
+            {
+                if (disable(row, col - 1))
+                {
+                    if (setLight(row - 1, col))
+                    {
+                        if (setLight(row, col + 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col + 1);
+                        }
+                        removeLight(row - 1, col);
+                    }
+                    enable(row, col - 1);
+                }
+                enable(row + 1, col);
+            }
+            if (disable(row - 1, col))
+            {
+                if (disable(row, col + 1))
+                {
+                    if (setLight(row + 1, col))
+                    {
+                        if (setLight(row, col - 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col - 1);
+                        }
+                        removeLight(row + 1, col);
+                    }
+                    enable(row, col + 1);
+                }
+                enable(row - 1, col);
+            }
+            if (disable(row - 1, col))
+            {
+                if (disable(row, col - 1))
+                {
+                    if (setLight(row + 1, col))
+                    {
+                        if (setLight(row, col + 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col + 1);
+                        }
+                        removeLight(row + 1, col);
+                    }
+                    enable(row, col - 1);
+                }
+                enable(row - 1, col);
+            }
+            if (disable(row - 1, col))
+            {
+                if (disable(row + 1, col))
+                {
+                    if (setLight(row, col - 1))
+                    {
+                        if (setLight(row, col + 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col + 1);
+                        }
+                        removeLight(row, col - 1);
+                    }
+                    enable(row + 1, col);
+                }
+                enable(row - 1, col);
+            }
+            break;
+        case 3:
+            if (disable(row, col + 1))
+            {
+                if (setLight(row - 1, col))
+                {
+                    if (setLight(row + 1, col))
+                    {
+                        if (setLight(row, col - 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col - 1);
+                        }
+                        removeLight(row + 1, col);
+                    }
+                    removeLight(row - 1, col);
+                }
+                enable(row, col + 1);
+            }
+            if (disable(row, col - 1))
+            {
+                if (setLight(row - 1, col))
+                {
+                    if (setLight(row + 1, col))
+                    {
+                        if (setLight(row, col + 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col + 1);
+                        }
+                        removeLight(row + 1, col);
+                    }
+                    removeLight(row - 1, col);
+                }
+                enable(row, col - 1);
+            }
+            if (disable(row + 1, col))
+            {
+                if (setLight(row - 1, col))
+                {
+                    if (setLight(row, col - 1))
+                    {
+                        if (setLight(row, col + 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col + 1);
+                        }
+                        removeLight(row, col - 1);
+                    }
+                    removeLight(row - 1, col);
+                }
+                enable(row + 1, col);
+            }
+            if (disable(row - 1, col))
+            {
+                if (setLight(row + 1, col))
+                {
+                    if (setLight(row, col - 1))
+                    {
+                        if (setLight(row, col + 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col + 1);
+                        }
+                        removeLight(row, col - 1);
+                    }
                     removeLight(row + 1, col);
-                    removeLight(row, col - 1);
-                    removeLight(row, col + 1);
                 }
                 enable(row - 1, col);
             }
             break;
         case 4:
-            if (setLight(row - 1, col) && setLight(row + 1, col) && setLight(row, col - 1) && setLight(row, col + 1))
+            if (setLight(row - 1, col))
             {
-                if (step(index + 1)) return true;
+                if (setLight(row + 1, col))
+                {
+                    if (setLight(row, col - 1))
+                    {
+                        if (setLight(row, col + 1))
+                        {
+                            if (step(index + 1)) return true;
+                            removeLight(row, col + 1);
+                        }
+                        removeLight(row, col - 1);
+                    }
+                    removeLight(row + 1, col);
+                }
                 removeLight(row - 1, col);
-                removeLight(row + 1, col);
-                removeLight(row, col - 1);
-                removeLight(row, col + 1);
             }
             break;
     }
     //printf("dead\n");
-    //displayLight();
     return false;
 }
 
