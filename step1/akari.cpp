@@ -97,7 +97,7 @@ bool setLight(int row, int col)
     if (col < 0 || col >= aka::column) return false;
 
     //printf("%d %d setable: %d\n", row, col, light[row][col].setable);
-    if (light[row][col].setable < 0) return false;
+    if (light[row][col].setable <= 0) return false;
     if (light[row][col].hasLight > 0)
     {
         light[row][col].hasLight++;
