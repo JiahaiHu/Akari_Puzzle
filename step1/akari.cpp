@@ -189,6 +189,7 @@ void scanNumberGrids()
 
 void scanUnlightedGrids()
 {
+    unlightedGrids.clear();
     Position pos;
     for (int i = 0; i < row; i++)
     {
@@ -233,7 +234,7 @@ bool complement()
         count--;
         if (ret) removeLight(row, col);
     }
-    
+
     return false;
 }
 
